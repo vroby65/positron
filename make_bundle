@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+# Crea un eseguibile auto-estrarante che contiene: positron + www
+# Uso:
+#   ./make_bundle --positron ./positron --www ./www --out ./mia-app.pyw
+import argparse, base64, io, zipfile, os, sys, stat
+from pathlib import Path
+
+STUB_TEMPLATE = r'''#!/usr/bin/env python3
+# Positron self-extracting launcher (estrae in temp cross-platform)
+import os, sys, base64, zipfile, io, tempfile, shutil, subprocess, stat, uuid
+
+def choose_base_tmp():
+    return tempfile.gettempdir()
+
+def unique_dir(base):
+    d = os.path.join(base, f"positron-{uuid.uuid4().hex[:8]}")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+PAYLOAD_B64 = """__PAYLOAD_B64__"""
+
+def extract_to(target):
+    raw = base64.b64decode(PAYLOAD_B64.encode("ascii"))
+    with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+        zf.extractall(target)
+
+def make_executable(path):
+    try:
+        mode = os.stat(path).st_mode
+        os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    except Exception:
+        pass
+
+def build_cmd(exe_path):
+    # WINDOWS: se non è un vero binario, esegui via Python
+    if os.name == "nt":
+        low = exe_path.lower()
+        if low.endswith(".exe") or low.endswith(".bat") or low.endswith(".cmd"):
+            return [exe_path]
+        # usa lo stesso interprete che sta eseguendo lo stub (python o pythonw)
+        return [sys.executable or "python", exe_path]
+    # POSIX: .py via Python; altrimenti tenta l'esecuzione diretta
+    if exe_path.endswith(".py"):
+        return [sys.executable or "python3", exe_path]
+    return [exe_path]
+
+def main():
+    base = choose_base_tmp()
+    dest = unique_dir(base)
+    extract_to(dest)
+
+    # trova l'eseguibile
+    candidates = ["positron", "positron.py"]
+    exe = next((os.path.join(dest, n) for n in candidates if os.path.exists(os.path.join(dest, n))), None)
+    if exe is None:
+        print("Errore: payload corrotto, 'positron' non trovato.", file=sys.stderr)
+        sys.exit(2)
+
+    make_executable(exe)
+
+    # forwarding degli argomenti + scelta interprete corretta
+    cmd = build_cmd(exe) + sys.argv[1:]
+
+    # Titolo = nome del bundle (senza estensione), se non già impostato
+    bundle_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+    env = os.environ.copy()
+    env.setdefault("POSITRON_TITLE", bundle_name)
+
+    # Log opzionale
+    if env.get("POSITRON_VERBOSE", "").lower() in ("1", "true", "yes"):
+        print("[stub] cwd:", dest)
+        print("[stub] cmd:", cmd)
+        print("[stub] title:", env["POSITRON_TITLE"])
+
+    keep = env.get("POSITRON_KEEP", "").lower() in ("1", "true", "yes")
+    try:
+        rc = subprocess.call(cmd, cwd=dest, env=env)
+    finally:
+        if not keep:
+            try: shutil.rmtree(dest)
+            except Exception: pass
+    sys.exit(rc)
+
+if __name__ == "__main__":
+    main()
+'''
+
+def make_payload(positron: Path, www: Path) -> str:
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        z.write(positron, arcname=positron.name)
+        for p in www.rglob("*"):
+            if p.is_file():
+                z.write(p, arcname=str(Path("www") / p.relative_to(www)))
+    return base64.b64encode(mem.getvalue()).decode("ascii")
+
+def main():
+    ap = argparse.ArgumentParser(description="Crea un eseguibile auto-estrarante per Positron")
+    ap.add_argument("--positron", type=Path, default=Path("positron"),
+                    help="file eseguibile o script di Positron (default: ./positron)")
+    ap.add_argument("--www", type=Path, default=Path("www"),
+                    help="cartella 'www' da includere (default: ./www)")
+    ap.add_argument("--out", type=Path, default=Path("positron-sfx"),
+                    help="percorso file di output (default: ./positron-sfx)")
+    args = ap.parse_args()
+
+    if not args.positron.exists():
+        sys.exit(f"File non trovato: {args.positron}")
+    if not args.www.is_dir():
+        sys.exit(f"Cartella non trovata: {args.www}")
+
+    # su Windows: se non hai messo l'estensione, usa .pyw per doppio click senza console
+    if os.name == "nt" and args.out.suffix.lower() not in (".py", ".pyw", ".bat", ".cmd", ".exe"):
+        args.out = args.out.with_suffix(".pyw")
+
+    payload_b64 = make_payload(args.positron, args.www)
+    script = STUB_TEMPLATE.replace("__PAYLOAD_B64__", payload_b64)
+    args.out.write_text(script, encoding="utf-8")
+
+    try:
+        os.chmod(args.out, os.stat(args.out).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    except Exception:
+        pass
+
+    # wrapper .bat (comodo da prompt)
+    if os.name == "nt" and args.out.suffix.lower() == ".pyw":
+        bat = args.out.with_suffix(".bat")
+        bat.write_text(f'@echo off\r\npyw "%~dp0{args.out.name}" %*\r\n', encoding="utf-8")
+
+    print(f"Creato: {args.out}")
+
+if __name__ == "__main__":
+    main()
