@@ -2,23 +2,29 @@
 
 A tiny **Electron-like** runtime built with **Python + pywebview**.
 
-* Serves files from `./www` at `http://127.0.0.1:7000`
-* Opens a native window that loads that URL
-* **Persistence** (localStorage/cookies) per bundle
-* **Self-extracting bundle**: a single file that extracts `positron` + `www` to a temporary folder and runs the app
-* **Cross-platform**: Linux, Windows, macOS
+- Serves files from `./www` at `http://127.0.0.1:7000`
+- Opens a native window that loads that URL
+- **Persistence** (localStorage/cookies/IndexedDB) per bundle
+- **Download helper**: moves files from Downloads with *Save As…* dialog  
+  - asks if you want to overwrite  
+  - auto-renames if you say no  
+  - deletes the file if you cancel the dialog  
+- **Self-extracting bundle**: a single file that extracts `positron` + `www` to a temporary folder and runs the app
+- **Cross-platform**: Linux, Windows, macOS
 
 ---
 
 ## Project structure
 
 ```
+
 .
 ├── positron            # runner (Python script / executable)
-├── make_bundle         # creates self-extracting bundle
+├── make\_bundle         # creates self-extracting bundle
 ├── www/                # your web app (index.html, css, js, …)
 └── requirements.txt    # Python dependencies (pywebview)
-```
+
+````
 
 ---
 
@@ -26,31 +32,34 @@ A tiny **Electron-like** runtime built with **Python + pywebview**.
 
 ### Common
 
-* Python 3.9+ recommended (3.8+ usually works)
-* `pywebview`:
+- Python 3.9+ recommended (3.8+ usually works)  
+- `pywebview`:
 
-  ```bash
-  pip install -r requirements.txt
-  # or
-  pip install pywebview
-  ```
+```bash
+pip install -r requirements.txt
+# or
+pip install pywebview
+````
 
 ### Linux
 
 * Backend **GTK/WebKit2** (recommended) **or** **Qt WebEngine**
-* Debian/Ubuntu/Mint:
 
-  ```bash
-  sudo apt install python3-gi gir1.2-webkit2-4.1 libwebkit2gtk-4.1-0
-  # if 4.1 is missing:
-  sudo apt install python3-gi gir1.2-webkit2-4.0 libwebkit2gtk-4.0-37
-  ```
-* Alternative Qt backend:
+Debian/Ubuntu/Mint:
 
-  ```bash
-  pip install PyQt5 PyQtWebEngine
-  ```
-* Arch/Fedora equivalents: install `webkit2gtk` + `python-gobject`, or Qt packages.
+```bash
+sudo apt install python3-gi gir1.2-webkit2-4.1 libwebkit2gtk-4.1-0
+# if 4.1 is missing:
+sudo apt install python3-gi gir1.2-webkit2-4.0 libwebkit2gtk-4.0-37
+```
+
+Alternative Qt backend:
+
+```bash
+pip install PyQt5 PyQtWebEngine
+```
+
+Arch/Fedora: install `webkit2gtk` + `python-gobject`, or Qt packages.
 
 ### Windows
 
@@ -68,9 +77,6 @@ A tiny **Electron-like** runtime built with **Python + pywebview**.
 ---
 
 ## Quick start (without bundle)
-
-1. Install dependencies (see above)
-2. Run the runner:
 
 ```bash
 # Linux/macOS
@@ -114,8 +120,6 @@ On first run, a default `www/index.html` is created.
 
 ## Creating a self-extracting bundle
 
-Generate a single file containing **positron + www**. On startup, it extracts to a temp dir and launches the app.
-
 ```bash
 # Linux/macOS
 ./make_bundle --positron ./positron --www ./www --out ./myapp
@@ -140,7 +144,7 @@ myapp.bat --size 1200x800 --gui edgechromium
 
 ---
 
-## Persistence (localStorage/cookies)
+## Persistence (localStorage/IndexedDB)
 
 * Enabled in the runner with `private_mode=False` and `storage_path` per bundle.
 * Data stored in:
@@ -151,14 +155,26 @@ myapp.bat --size 1200x800 --gui edgechromium
 
 ---
 
+## Download watcher
+
+* Watches your system’s default **Downloads** directory
+* Detects finished files (`.part`, `.crdownload`, etc. are ignored)
+* Opens a **Save As…** dialog:
+
+  * If file exists → asks to overwrite
+  * If you click *No* → renames as `file (1).ext`
+  * If you *cancel* → file is **deleted** from Downloads
+
+---
+
 ## Window title
 
-* By default = the **bundle filename**.
-* Can be overridden:
+Default = bundle filename.
+Override with env var:
 
-  ```bash
-  POSITRON_TITLE="Custom Title" ./myapp
-  ```
+```bash
+POSITRON_TITLE="Custom Title" ./myapp
+```
 
 ---
 
@@ -210,7 +226,7 @@ pyinstaller --onefile --name myapp --collect-all webview positron
 ## Troubleshooting
 
 * **`ModuleNotFoundError: No module named 'webview'`**
-  → You installed the wrong package.
+  → Wrong package. Use `pywebview`, not `webview`.
 
   ```bash
   pip uninstall -y webview
@@ -223,18 +239,17 @@ pyinstaller --onefile --name myapp --collect-all webview positron
   * Linux: WebKit2 (`python3-gi + webkit2gtk`) or Qt (`PyQt5 + PyQtWebEngine`)
   * Windows: Edge WebView2 Runtime or Qt
   * macOS: `pyobjc` (Cocoa/WebKit) or Qt
-    → Try `--gui gtk|qt|edgechromium|cocoa`
 
-* **LocalStorage doesn’t persist**
-  → Ensure runner uses `private_mode=False` and a `storage_path`.
-  → Use consistent origin (`http://127.0.0.1:7000`).
+* **LocalStorage/IndexedDB doesn’t persist**
+  → Ensure `private_mode=False` and `storage_path` set
+  → Use consistent origin (`http://127.0.0.1:7000`)
 
 * **Windows: “not a valid Win32 application”**
-  → You tried to run a `.pyw` file as if it were `.exe`.
+  → `.pyw` file is not an `.exe`.
 
   * Launch with `py myapp.pyw`
-  * Double-click `.pyw` (no console)
-  * Or build a `.exe` with PyInstaller.
+  * Double-click `.pyw`
+  * Or build `.exe` with PyInstaller
 
 ---
 
@@ -254,4 +269,4 @@ MIT (or any you choose).
 ## Why Positron?
 
 Because it’s **tiny**, **simple**, and already **cross-platform**:
-Write HTML/CSS/JS in `www/`, and you have a desktop app with persistence, window sizing, and single-file packaging.
+Write HTML/CSS/JS in `www/`, and you have a desktop app with persistence, file download handling, and single-file packaging.
