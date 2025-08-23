@@ -124,11 +124,11 @@ def _enable_webkitgtk_settings(native_webview) -> bool:
                     settings.set_property(prop, True)
                     changed = True
                     print(f"[positron] WebKitGTK setting '{prop}' -> True")
-            except Exception:
+            except Exception: # pylint: disable=broad-exception-caught
                 pass
         try:
             settings.set_property("enable-developer-extras", True)
-        except Exception:
+        except Exception: # pylint: disable=broad-exception-caught
             pass
     except Exception as e:
         print(f"[positron] WebKitGTK settings tweak skipped: {e}")
@@ -147,13 +147,13 @@ def _pin_qt_profile(storage_dir: Path, window: "webview.Window") -> None:
         profile.setPersistentStoragePath(q_data)
         profile.setCachePath(q_cache)
         try:
-            from PyQt5.QtWebEngineWidgets import QWebEngineProfile as _QEP  # type: ignore
+            from PyQt5.QtWebEngineWidgets import QWebEngineProfile as _QEP  # type: ignore  # pylint: disable=import-error,no-name-in-module,import-outside-toplevel
             profile.setPersistentCookiesPolicy(_QEP.ForcePersistentCookies)
-        except Exception:
+        except Exception: # pylint: disable=broad-exception-caught
             try:
                 from PySide6.QtWebEngineCore import QWebEngineProfile as _QEP  # type: ignore
                 profile.setPersistentCookiesPolicy(_QEP.ForcePersistentCookies)
-            except Exception:
+            except Exception: # pylint: disable=broad-exception-caught
                 pass
         print(f"[positron] Qt profile pinned -> data={q_data} cache={q_cache}")
     except Exception as e:
@@ -183,7 +183,7 @@ def _infer_backend(window: "webview.Window") -> str:
 def _setup_persistence(renderer_hint: str | None, window: "webview.Window",
     storage_dir: Path) -> bool:
     """Set up persistent storage for the given webview backend."""
-    global _PERSISTENCE_SETUP_DONE
+    global _PERSISTENCE_SETUP_DONE # pylint: disable=global-statement
     if _PERSISTENCE_SETUP_DONE:
         return False
     _PERSISTENCE_SETUP_DONE = True
