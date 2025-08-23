@@ -63,13 +63,15 @@ def wait_for_server(host: str, port: int, timeout: float = 5.0) -> bool:
                 time.sleep(0.1)
     return False
 
-def start_http_server(root: Path, host: str, port: int, no_cache: bool = False) -> ThreadingHTTPServer:
+def start_http_server(root: Path, host: str, port: int,
+    no_cache: bool = False) -> ThreadingHTTPServer:
     """Start an HTTP server serving files from root."""
     class Handler(SimpleHTTPRequestHandler):
+        """Custom HTTP request handler for Positron."""
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(root), **kwargs)
 
-        def log_message(self, fmt, *args):
+       def log_message(self, fmt, *args):  # pylint: disable=arguments-differ
             sys.stdout.write(f"[http] {self.address_string()} - " + (fmt % args) + "\n")
 
         def end_headers(self):
@@ -178,7 +180,8 @@ def _infer_backend(window: "webview.Window") -> str:
         pass
     return ""
 
-def _setup_persistence(renderer_hint: str | None, window: "webview.Window", storage_dir: Path) -> bool:
+def _setup_persistence(renderer_hint: str | None, window: "webview.Window",
+    storage_dir: Path) -> bool:
     """Set up persistent storage for the given webview backend."""
     global _PERSISTENCE_SETUP_DONE
     if _PERSISTENCE_SETUP_DONE:
@@ -412,7 +415,8 @@ def main():
     ap.add_argument("--gui", help="GUI backend (gtk/qt/edgechromium/mshtml/cocoa)")
     ap.add_argument("--debug", action="store_true", help="Enable pywebview debug logging")
     ap.add_argument("--size", type=parse_size, help="Window size: WIDTHxHEIGHT")
-    ap.add_argument("--min-size", dest="min_size", type=parse_size, help="Minimum size: WIDTHxHEIGHT")
+    ap.add_argument("--min-size", dest="min_size",
+                    type=parse_size, help="Minimum size: WIDTHxHEIGHT")
     ap.add_argument("--pos", type=parse_pos, help="Initial position: X,Y")
     ap.add_argument("--fullscreen", action="store_true", help="Start fullscreen")
     ap.add_argument("--fixed", action="store_true", help="Non-resizable window")
