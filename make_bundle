@@ -118,6 +118,7 @@ def make_payload(positron: Path, www: Path) -> str:
     return base64.b64encode(mem.getvalue()).decode("ascii")
 
 def main():
+    """Main entry point for the make_bundle runner."""
     ap = argparse.ArgumentParser(
         description="Create a self-extracting executable for Positron (bundles launcher + ./www)."
     )
