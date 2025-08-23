@@ -9,7 +9,13 @@
 #   launches ./positron (or positron.py) with the bundled ./www,
 #   and deletes the temp folder on exit (unless POSITRON_KEEP=1).
 
-import argparse, base64, io, zipfile, os, sys, stat
+import argparse
+import base64
+import io
+import zipfile
+import os
+import sys
+import stat
 from pathlib import Path
 
 STUB_TEMPLATE = r'''#!/usr/bin/env python3

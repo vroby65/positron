@@ -223,7 +223,12 @@ TEMP_EXTS = (".crdownload", ".part", ".partial", ".download", ".tmp")
 def detect_download_dir() -> Path:
     if sys.platform.startswith("linux"):
         try:
-            out = subprocess.check_output(["xdg-user-dir", "DOWNLOAD"], text=True, stderr=subprocess.DEVNULL).strip()
+            out = subprocess.check_output(
+              ["xdg-user-dir","DOWNLOAD"],
+              text=True,
+              stderr=subprocess.DEVNULL
+            ).strip()
+            
             if out and Path(out).exists():
                 return Path(out)
         except Exception:
