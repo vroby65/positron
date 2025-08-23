@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8"><title>Positron</title>
+<style>
+  :root{color-scheme:light dark}body{font:16px/1.5 system-ui;margin:2rem;max-width:60ch}
+</style>
+<h1>Positron is alive ✨</h1>
+<p>This page is served from <code>./www</code>. Edit <code>www/index.html</code>.</p>
+<p id="ls"></p>
+<script>
+  const n = +(localStorage.getItem("visits")||0) + 1;
+  localStorage.setItem("visits", n);
+  document.getElementById("ls").innerHTML = "Visits (localStorage): <b>"+n+"</b>";
+</script>

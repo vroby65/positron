@@ -28,23 +28,30 @@ PORT = 7000
 
 # ----------------- small utilities -------------------------------------------
 def parse_size(s: str):
+    """Parse a WIDTHxHEIGHT string and return (w, h)."""
     try:
         w, h = s.lower().split("x")
         w, h = int(w), int(h)
         if w < 100 or h < 100:
             raise ValueError
         return (w, h)
-    except Exception:
-        raise argparse.ArgumentTypeError("Expected: WIDTHxHEIGHT (e.g. 1200x800)")
+    except Exception as exc:
+        raise argparse.ArgumentTypeError(
+            "Expected: WIDTHxHEIGHT (e.g. 1200x800)"
+        ) from exc
 
 def parse_pos(s: str):
+    """Parse an X,Y string and return (x, y)."""
     try:
         x, y = s.split(",")
         return (int(x), int(y))
-    except Exception:
-        raise argparse.ArgumentTypeError("Expected: X,Y (e.g. 100,50)")
+    except Exception as exc:
+        raise argparse.ArgumentTypeError(
+            "Expected: X,Y (e.g. 100,50)"
+        ) from exc
 
 def wait_for_server(host: str, port: int, timeout: float = 5.0) -> bool:
+    """Wait until a server responds within the timeout."""
     deadline = time.time() + timeout
     while time.time() < deadline:
         with socket.socket() as s:
@@ -56,12 +63,15 @@ def wait_for_server(host: str, port: int, timeout: float = 5.0) -> bool:
                 time.sleep(0.1)
     return False
 
-def start_http_server(root:Path, host:str, port:int, no_cache:bool = False)->ThreadingHTTPServer:
+def start_http_server(root: Path, host: str, port: int, no_cache: bool = False) -> ThreadingHTTPServer:
+    """Start an HTTP server serving files from root."""
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(root), **kwargs)
+
         def log_message(self, fmt, *args):
             sys.stdout.write(f"[http] {self.address_string()} - " + (fmt % args) + "\n")
+
         def end_headers(self):
             if no_cache:
                 self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
@@ -75,6 +85,7 @@ def start_http_server(root:Path, host:str, port:int, no_cache:bool = False)->Thr
     return httpd
 
 def ensure_default_index(www_dir: Path) -> None:
+    """Ensure www_dir contains a default index.html page."""
     index = www_dir / "index.html"
     if index.exists():
         return
@@ -100,6 +111,7 @@ _PERSISTENCE_SETUP_DONE = False
 _LAST_STORAGE_DIR: Path
 
 def _enable_webkitgtk_settings(native_webview) -> bool:
+    """Enable useful WebKitGTK settings if available."""
     changed = False
     try:
         settings = native_webview.get_settings()
@@ -121,6 +133,7 @@ def _enable_webkitgtk_settings(native_webview) -> bool:
     return changed
 
 def _pin_qt_profile(storage_dir: Path, window: "webview.Window") -> None:
+    """Configure persistent Qt WebEngine profile for storage and cookies."""
     try:
         native = getattr(window, "native", None)
         if not native:
@@ -145,6 +158,7 @@ def _pin_qt_profile(storage_dir: Path, window: "webview.Window") -> None:
         print(f"[positron] Qt profile pin skipped: {e}")
 
 def _infer_backend(window: "webview.Window") -> str:
+    """Infer the backend type (gtk or qt) from a webview window."""
     try:
         native = getattr(window, "native", None)
         if not native:
@@ -158,13 +172,14 @@ def _infer_backend(window: "webview.Window") -> str:
             try:
                 _ = wv.page()
                 return "qt"
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         pass
     return ""
 
-def _setup_persistence(renderer_hint:str | None, window:"webview.Window", storage_dir:Path)->bool:
+def _setup_persistence(renderer_hint: str | None, window: "webview.Window", storage_dir: Path) -> bool:
+    """Set up persistent storage for the given webview backend."""
     global _PERSISTENCE_SETUP_DONE
     if _PERSISTENCE_SETUP_DONE:
         return False
@@ -175,7 +190,7 @@ def _setup_persistence(renderer_hint:str | None, window:"webview.Window", storag
         active = getattr(webview, "guilib", "") or ""
         if active:
             r = active.lower()
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         pass
 
     if not r:
@@ -199,46 +214,55 @@ def _setup_persistence(renderer_hint:str | None, window:"webview.Window", storag
                     native.webview.reload()
                     print("[positron] WebKitGTK settings applied -> reload")
                     return True
-                except Exception as e:
+                except Exception as e:  # pylint: disable=broad-exception-caught
                     print(f"[positron] reload failed after settings: {e}")
             return False
         else:
             print("[positron] other backend -> rely on storage_path")
             return False
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"[positron] persistence setup failed: {e}")
         return False
 
 def on_loaded(window: "webview.Window"):
+    """Callback executed when the webview window is loaded."""
     try:
         reloaded = _setup_persistence(os.environ.get("PYWEBVIEW_GUI"), window, _LAST_STORAGE_DIR)
         if reloaded:
             return
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"[positron] persistence (late) error: {e}")
 
 # ----------------- download helper --------------------------------------------
 TEMP_EXTS = (".crdownload", ".part", ".partial", ".download", ".tmp")
 
 def detect_download_dir() -> Path:
+    """Detect the default Downloads directory for the current platform."""
     if sys.platform.startswith("linux"):
         try:
             out = subprocess.check_output(
-              ["xdg-user-dir","DOWNLOAD"],
-              text=True,
-              stderr=subprocess.DEVNULL
+                ["xdg-user-dir", "DOWNLOAD"],
+                text=True,
+                stderr=subprocess.DEVNULL
             ).strip()
-            
             if out and Path(out).exists():
                 return Path(out)
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             pass
         return Path.home() / "Downloads"
+
     if sys.platform.startswith("win"):
-        return Path(os.path.join(os.environ.get("USERPROFILE", str(Path.home())), "Downloads"))
+        return Path(
+            os.path.join(
+                os.environ.get("USERPROFILE", str(Path.home())),
+                "Downloads"
+            )
+        )
+
     return Path.home() / "Downloads"
 
 def is_temp_file(path: Path) -> bool:
+    """Return True if the file looks like a temporary file."""
     n = path.name.lower()
     if any(n.endswith(ext) for ext in TEMP_EXTS):
         return True
@@ -247,6 +271,7 @@ def is_temp_file(path: Path) -> bool:
     return False
 
 def choose_save_as(window: "webview.Window", default_name: str, start_dir: Path) -> Path | None:
+    """Open a save-as dialog and return the chosen path or None."""
     try:
         res = window.create_file_dialog(
             webview.SAVE_DIALOG,
@@ -258,11 +283,12 @@ def choose_save_as(window: "webview.Window", default_name: str, start_dir: Path)
         if isinstance(res, (list, tuple)):
             return Path(res[0])
         return Path(res)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"[positron] Save-as dialog error: {e}")
         return None
 
 def list_finished(dirpath: Path) -> set[str]:
+    """Return a set of finished files in dirpath (ignoring temp files)."""
     try:
         return {
             entry.name
@@ -273,6 +299,7 @@ def list_finished(dirpath: Path) -> set[str]:
         return set()
 
 def wait_file_stable(p: Path, stable_secs: float = 0.8, timeout: float = 300.0) -> bool:
+    """Wait until file size stays stable for stable_secs or until timeout."""
     start = time.time()
     try:
         last = os.stat(p).st_size
@@ -294,6 +321,7 @@ def wait_file_stable(p: Path, stable_secs: float = 0.8, timeout: float = 300.0) 
     return False
 
 def unique_destination(path: Path) -> Path:
+    """Return a unique file path by adding (n) if needed."""
     if not path.exists():
         return path
     stem, suffix = path.stem, path.suffix
@@ -305,19 +333,26 @@ def unique_destination(path: Path) -> Path:
             return candidate
         i += 1
 
-def download_watcher_polling(stop_event: threading.Event, window: "webview.Window", storage_dir: Path, watch_dir: Path):
+def download_watcher_polling(
+    stop_event: threading.Event,
+    window: "webview.Window",
+    storage_dir: Path,
+    watch_dir: Path
+):
+    """Watch a directory for new downloads and handle save/move dialogs."""
     seen = list_finished(watch_dir)
     print(f"[positron] polling watching {watch_dir}")
 
     delay = 0.5
-    MIN_DELAY, MAX_DELAY = 0.5, 4.0
+    min_delay, max_delay = 0.5, 4.0  # pylint: disable=invalid-name
 
     def confirm_overwrite(path: Path) -> bool:
+        """Ask the user if an existing file should be overwritten."""
         try:
             msg = f"File '{path.name}' already exists.\nDo you want to overwrite it?"
             res = window.create_confirmation_dialog("Overwrite file?", msg)
             return bool(res)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"[positron] overwrite confirm dialog error: {e}")
             return False
 
@@ -326,18 +361,17 @@ def download_watcher_polling(stop_event: threading.Event, window: "webview.Windo
             current = list_finished(watch_dir)
             new = current - seen
             if new:
-                delay = MIN_DELAY
+                delay = min_delay
                 for fname in sorted(new):
                     src = watch_dir / fname
                     wait_file_stable(src, stable_secs=0.8, timeout=300.0)
 
                     dst = choose_save_as(window, default_name=fname, start_dir=watch_dir)
                     if not dst:
-                        # annullato -> cancelliamo il file
                         try:
                             src.unlink()
                             print(f"[positron] User cancelled -> deleted {src}")
-                        except Exception as e:
+                        except Exception as e:  # pylint: disable=broad-exception-caught
                             print(f"[positron] Cannot delete cancelled file {src}: {e}")
                         continue
 
@@ -349,7 +383,7 @@ def download_watcher_polling(stop_event: threading.Event, window: "webview.Windo
                             try:
                                 dst.unlink()
                                 print(f"[positron] Overwriting {dst}")
-                            except Exception as e:
+                            except Exception as e:  # pylint: disable=broad-exception-caught
                                 print(f"[positron] Cannot remove existing {dst}: {e}")
                                 dst = unique_destination(dst)
                         else:
@@ -359,19 +393,20 @@ def download_watcher_polling(stop_event: threading.Event, window: "webview.Windo
                         dst.parent.mkdir(parents=True, exist_ok=True)
                         shutil.move(str(src), str(dst))
                         print(f"[positron] Moved {fname} -> {dst}")
-                    except Exception as e:
+                    except Exception as e:  # pylint: disable=broad-exception-caught
                         print(f"[positron] Move failed: {e}")
                 seen = current
             else:
-                delay = min(MAX_DELAY, delay * 1.3)
+                delay = min(max_delay, delay * 1.3)
             time.sleep(delay)
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"[positron] polling watcher error: {e}")
             time.sleep(1.0)
 
 # ----------------- main -------------------------------------------------------
 def main():
-    global _LAST_STORAGE_DIR
+    """Main entry point for the Positron runner."""
+    global _LAST_STORAGE_DIR  # pylint: disable=global-statement
 
     ap = argparse.ArgumentParser(description="Positron runner")
     ap.add_argument("--gui", help="GUI backend (gtk/qt/edgechromium/mshtml/cocoa)")
@@ -423,6 +458,7 @@ def main():
         win_kwargs["resizable"] = False
 
     def pick_default_gui():
+        """Pick default GUI backend based on platform."""
         if sys.platform.startswith("linux"):
             return "gtk"
         if sys.platform == "darwin":
@@ -440,14 +476,16 @@ def main():
 
     try:
         _setup_persistence(selected_gui, window, storage_dir)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"[positron] early persistence setup skipped: {e}")
 
     watch_dir = Path(args.watch_dir).expanduser() if args.watch_dir else detect_download_dir()
     stop_event = threading.Event()
-    t = threading.Thread(target=download_watcher_polling,
-                         args=(stop_event, window, storage_dir, watch_dir),
-                         daemon=True)
+    t = threading.Thread(
+        target=download_watcher_polling,
+        args=(stop_event, window, storage_dir, watch_dir),
+        daemon=True,
+    )
     print("[positron] watcher mode: polling")
     t.start()
 
@@ -464,6 +502,7 @@ def main():
         stop_event.set()
         httpd.shutdown()
         httpd.server_close()
+
 
 if __name__ == "__main__":
     main()
