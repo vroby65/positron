@@ -26,4 +26,4 @@ jobs:
 
       - name: Run pylint
         run: |
-          pylint --disable=C0116,C0301 positron make_bundle
+          pylint positron make_bundle
