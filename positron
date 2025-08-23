@@ -210,7 +210,7 @@ def _setup_persistence(renderer_hint: str | None, window: "webview.Window",
         if "qt" in r:
             _pin_qt_profile(storage_dir, window)
             return False
-        elif ("gtk" in r) or ("webkit" in r):
+        if ("gtk" in r) or ("webkit" in r):
             changed = _enable_webkitgtk_settings(native.webview)
             if changed:
                 try:
