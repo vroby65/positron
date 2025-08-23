@@ -339,7 +339,7 @@ def unique_destination(path: Path) -> Path:
 def download_watcher_polling(
     stop_event: threading.Event,
     window: "webview.Window",
-    storage_dir: Path,
+    _storage_dir: Path,
     watch_dir: Path
 ):
     """Watch a directory for new downloads and handle save/move dialogs."""
