@@ -11,7 +11,7 @@ Features:
 """
 
 from __future__ import annotations
-import os, sys, time, json, socket, shutil, threading, argparse, subprocess
+import os, sys, time, socket, shutil, threading, argparse, subprocess
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 import webview
@@ -49,7 +49,7 @@ def wait_for_server(host: str, port: int, timeout: float = 5.0) -> bool:
                 time.sleep(0.1)
     return False
 
-def start_http_server(root: Path, host: str, port: int, no_cache: bool = False) -> ThreadingHTTPServer:
+def start_http_server(root:Path, host:str, port:int, no_cache:bool = False)->ThreadingHTTPServer:
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(root), **kwargs)
@@ -74,7 +74,9 @@ def ensure_default_index(www_dir: Path) -> None:
     index.write_text(
         """<!doctype html>
 <meta charset="utf-8"><title>Positron</title>
-<style>:root{color-scheme:light dark}body{font:16px/1.5 system-ui;margin:2rem;max-width:60ch}</style>
+<style>
+  :root{color-scheme:light dark}body{font:16px/1.5 system-ui;margin:2rem;max-width:60ch}
+</style>
 <h1>Positron is alive ✨</h1>
 <p>This page is served from <code>./www</code>. Edit <code>www/index.html</code>.</p>
 <p id="ls"></p>
@@ -155,7 +157,7 @@ def _infer_backend(window: "webview.Window") -> str:
         pass
     return ""
 
-def _setup_persistence(renderer_hint: str | None, window: "webview.Window", storage_dir: Path) -> bool:
+def _setup_persistence(renderer_hint:str | None, window:"webview.Window", storage_dir:Path)->bool:
     global _PERSISTENCE_SETUP_DONE
     if _PERSISTENCE_SETUP_DONE:
         return False
