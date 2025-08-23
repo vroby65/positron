@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-# Create a self-extracting executable that bundles: positron + www
-#
-# Usage:
-#   ./make_bundle --positron ./positron --www ./www --out ./my-app.pyw
-#
-# Result:
-#   A single launcher file that, when run, extracts to a temp folder,
-#   launches ./positron (or positron.py) with the bundled ./www,
-#   and deletes the temp folder on exit (unless POSITRON_KEEP=1).
+"""
+ Create a self-extracting executable that bundles: positron + www
+
+ Usage:
+   ./make_bundle --positron ./positron --www ./www --out ./my-app.pyw
+
+ Result:
+   A single launcher file that, when run, extracts to a temp folder,
+   launches ./positron (or positron.py) with the bundled ./www,
+   and deletes the temp folder on exit (unless POSITRON_KEEP=1).
+"""
 
 import argparse
 import base64
@@ -147,8 +149,12 @@ def main():
 
     # Best effort: make the output executable on POSIX
     try:
-        os.chmod(args.out, os.stat(args.out).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    except Exception:
+        mode = os.stat(args.out).st_mode
+        os.chmod(
+            args.out,
+            mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
         pass
 
     # Optional: create a .bat wrapper for convenience if output is .pyw
