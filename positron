@@ -290,6 +290,18 @@ def choose_save_as(window: "webview.Window", default_name: str, start_dir: Path)
         print(f"[positron] Save-as dialog error: {e}")
         return None
 
+class Api:
+    """JS bridge exposed to pages as window.pywebview.api."""
+
+    def save_file(self, filename: str, content: str) -> str:
+        """Save text provided by the page through a native Save As dialog."""
+        path = choose_save_as(webview.windows[0], default_name=filename, start_dir=Path.home())
+        if not path:
+            return "Cancelled"
+        path.write_text(str(content), encoding="utf-8")
+        print(f"[positron] Saved file -> {path}")
+        return f"Saved to {path}"
+
 def list_finished(dirpath: Path) -> set[str]:
     """Return a set of finished files in dirpath (ignoring temp files)."""
     try:
@@ -476,7 +488,7 @@ def main():
 
     h = (www_dir / "index.html").stat().st_size
     url = f"http://{HOST}:{PORT}/index.html?{h}"
-    window = webview.create_window(bundle_title, url, **win_kwargs)
+    window = webview.create_window(bundle_title, url, js_api=Api(), **win_kwargs)
 
     try:
         _setup_persistence(selected_gui, window, storage_dir)
