@@ -214,6 +214,14 @@ myapp.bat --size 1200x800 --gui edgechromium
 
 ---
 
+## 📥 Releases
+
+Source archives such as `positron.tar.xz` are published as assets on the
+[GitHub Releases page](https://github.com/vroby65/positron/releases) and are not
+stored in the repository.
+
+---
+
 ## 💾 Persistent storage
 
 - Each app keeps its own persistent data (localStorage, cookies, IndexedDB).

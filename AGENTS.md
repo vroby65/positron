@@ -20,7 +20,8 @@ packaging.
 - `www/`: source for the bundled Memory example.
 - `memory`, `memory.py`, and `memory.pyw`: generated Memory bundles.
 - `positron-hello`: generated hello example with its own embedded web payload.
-- `positron.tar.xz`: generated source distribution.
+- `dist/positron.tar.xz`: generated release asset; `dist/` is ignored and its
+  contents must never be committed.
 - `install`: POSIX setup and launch helper.
 - `tests/test_project.py`: regression and artifact-consistency tests.
 - `.venv/`: local environment; never commit it.
@@ -71,12 +72,16 @@ artifacts with:
 ```
 
 When refreshing only the runner in `positron-hello`, preserve its existing
-embedded `www/` payload. Rebuild the source archive with:
+embedded `www/` payload. Build the source archive for a GitHub Release with:
 
 ```bash
-tar -cJf positron.tar.xz requirements.txt positron make_bundle install README.md LICENSE
-chmod 644 positron.tar.xz
+mkdir -p dist
+tar -cJf dist/positron.tar.xz requirements.txt positron make_bundle install README.md LICENSE
+chmod 644 dist/positron.tar.xz
 ```
+
+Upload the archive as a release asset. Do not copy it back to the repository
+root or add it to Git.
 
 After changing `positron`, refresh every generated artifact. The regression
 suite verifies that each artifact embeds the current runner.
@@ -108,4 +113,5 @@ virtual environment when setup instructions change.
 
 A change is complete when its regression test passes, relevant syntax and smoke
 checks pass, generated artifacts are synchronized, permissions remain safe, and
-`README.md` reflects every user-visible workflow or behavior change.
+`README.md` reflects every user-visible workflow or behavior change. Release
+archives belong in GitHub Releases, not in the repository tree.

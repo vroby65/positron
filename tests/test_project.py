@@ -4,7 +4,6 @@ import io
 import os
 import shutil
 import subprocess
-import tarfile
 import tempfile
 import unittest
 import zipfile
@@ -59,8 +58,7 @@ class BundleTests(unittest.TestCase):
             with self.subTest(bundle=name):
                 self.assertEqual(embedded_file(ROOT / name, "positron"), current)
 
-        with tarfile.open(ROOT / "positron.tar.xz") as archive:
-            self.assertEqual(archive.extractfile("positron").read(), current)
+        self.assertFalse((ROOT / "positron.tar.xz").exists())
 
 
 class RunnerTests(unittest.TestCase):
