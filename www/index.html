@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="memory.png">
+    <title>Memory Game</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        h1 {
+            font-size: 36px; /* Titolo più grande */
+            margin-bottom: 20px; /* Spazio extra tra il titolo e il canvas */
+        }
+
+        #memoryCanvas {
+            border: 1px solid #fff;
+        }
+
+        #score {
+            font-size: 24px;
+            margin-top: 10px;
+        }
+
+        #bestScore {
+            font-size: 18px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Memory</h1>
+    <img src='memory.png' width='128px'><br>
+    <canvas id="memoryCanvas" width="400" height="400"></canvas>
+    <div id="score">Tentativi: 0</div>
+    <div id="bestScore">Record inferiore: -</div>
+    <button onclick="resetBestScore()">reset record</button>
+    <script>
+        const canvas = document.getElementById("memoryCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("score");
+        const bestScoreElement = document.getElementById("bestScore");
+
+
+        let currentLevel = 0;
+        let tiles = [];
+        let openedTiles = [];
+        let matchedPairs = 0;
+        let attempts = 0;
+        let bestScore = Number(localStorage.getItem("memorybestScore")) || 99999999; // Carica il best score da localStorage, se disponibile, altrimenti è infinito
+        bestScoreElement.textContent = bestScore === 99999999 ? "Record inferiore: -" : `Record inferiore: ${bestScore}`;
+        const levels = [
+            { rows: 2, columns: 2 },
+            { rows: 4, columns: 4 },
+            { rows: 4, columns: 4 },
+            { rows: 6, columns: 6 },
+            { rows: 6, columns: 6 }
+        ];
+
+        const pastelColors = ["#FF6666", "#FFCC99", "#99FF99", "#99CCFF", "#FF99CC", "#CC99FF", "#FFD700", "#00CED1", "#FFA07A", "#9ACD32", "#00FA9A", "#FF4500", "#8A2BE2", "#4169E1", "#F0E68C", "#A52A2A", "#32CD32", "#20B2AA"];
+
+        canvas.addEventListener("click", onCanvasClick);
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function initializeLevel(level) {
+            matchedPairs = 0;
+            //attempts = 0;
+            tiles = [];
+            openedTiles = [];
+            shuffle(pastelColors);
+
+            const totalTiles = level.rows * level.columns;
+            const maxNumber = totalTiles / 2;
+            const numbersToUse = [];
+
+            for (let i = 1; i <= maxNumber; i++) {
+                numbersToUse.push(i, i); // Duplica i numeri per abbinarli
+            }
+
+            shuffle(numbersToUse);
+
+            const tileWidth = canvas.width / level.columns;
+            const tileHeight = canvas.height / level.rows;
+            for (let i = 0; i < totalTiles; i++) {
+                const x = (i % level.columns) * tileWidth;
+                const y = Math.floor(i / level.columns) * tileHeight;
+                const number = numbersToUse.pop();
+                const color = pastelColors[number - 1];
+                tiles.push({ x, y, color, number, matched: false, revealed: false });
+            }
+
+            shuffle(tiles); // Mischia le carte in modo casuale
+        }
+
+        function drawTile(x, y, color, number, revealed) {
+            ctx.fillStyle = revealed ? color : "#333"; // Grigio scuro quando non rivelato
+            ctx.fillRect(x, y, canvas.width / levels[currentLevel].columns - 1, canvas.height / levels[currentLevel].rows - 1);
+
+            if (revealed) {
+                ctx.strokeStyle = "black";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, canvas.width / levels[currentLevel].columns - 1, canvas.height / levels[currentLevel].rows - 1);
+                ctx.fillStyle = "black";
+                ctx.font = "30px Arial";
+                ctx.fillText(number, x + canvas.width / (2 * levels[currentLevel].columns) - 15, y + canvas.height / (2 * levels[currentLevel].rows) + 10);
+            }
+        }
+
+        function drawBoard() {
+            for (const tile of tiles) {
+                drawTile(tile.x, tile.y, tile.color, tile.number, tile.revealed);
+            }
+        }
+
+        function onCanvasClick(event) {
+            if (openedTiles.length < 2) {
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                const clickedTile = tiles.find(tile => !tile.matched && !tile.revealed && x >= tile.x && x < tile.x + canvas.width / levels[currentLevel].columns - 1 && y >= tile.y && y < tile.y + canvas.height / levels[currentLevel].rows - 1);
+
+                if (clickedTile) {
+                    clickedTile.revealed = true;
+                    openedTiles.push(clickedTile);
+                    attempts++;
+                    updateScore();
+
+                    drawBoard();
+                    if (openedTiles.length === 2) {
+                        setTimeout(checkMatch, 500);
+                    }
+                }
+            }
+        }
+
+        function checkMatch() {
+            const [firstTile, secondTile] = openedTiles;
+            if (firstTile.number === secondTile.number) {
+                firstTile.matched = true;
+                secondTile.matched = true;
+                matchedPairs++;
+                if (matchedPairs === tiles.length / 2) {
+                    if (currentLevel < levels.length - 1) {
+                        currentLevel++;
+                        initializeLevel(levels[currentLevel]);
+                        clearCanvas(); // Cancella il canvas tra un livello e l'altro
+                        alert("Livello superato! Passa al livello successivo.");
+                    } else {
+                        checkBestScore(); // Controlla il best score alla fine del gioco
+                        alert("Bravo! Hai superato tutti i livelli.");
+                    }
+                }
+            } else {
+                firstTile.revealed = false;
+                secondTile.revealed = false;
+            }
+            openedTiles = [];
+            drawBoard();
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function updateScore() {
+            scoreElement.textContent = `Tentativi: ${attempts}`;
+        }
+
+        function resetBestScore() {
+            bestScore = 99999999;
+            localStorage.removeItem("memorybestScore");
+            bestScoreElement.textContent = "Record inferiore: -";
+        }
+
+        function checkBestScore() {
+            if (attempts < bestScore) {
+                bestScore = attempts;
+                bestScoreElement.textContent = `Record inferiore: ${bestScore}`;
+                localStorage.setItem("memorybestScore", bestScore); // Salva il best score in localStorage
+            }
+        }
+
+        initializeLevel(levels[currentLevel]);
+        updateScore();
+        drawBoard();
+    </script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+# Positron self-extracting launcher (cross-platform temporary extraction)
+import os, sys, base64, zipfile, io, tempfile, shutil, subprocess, stat, uuid
+
+def choose_base_tmp():
+    return tempfile.gettempdir()
+
+def unique_dir(base):
+    d = os.path.join(base, f"positron-{uuid.uuid4().hex[:8]}")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+PAYLOAD_B64 = """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"""
+
+def extract_to(target):
+    raw = base64.b64decode(PAYLOAD_B64.encode("ascii"))
+    with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+        zf.extractall(target)
+
+def make_executable(path):
+    try:
+        mode = os.stat(path).st_mode
+        os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    except Exception:
+        pass
+
+def build_cmd(exe_path):
+    # Windows: if not a real binary, run via Python interpreter
+    if os.name == "nt":
+        low = exe_path.lower()
+        if low.endswith(".exe") or low.endswith(".bat") or low.endswith(".cmd"):
+            return [exe_path]
+        return [sys.executable or "python", exe_path]
+    # POSIX: run .py with Python; others directly
+    if exe_path.endswith(".py"):
+        return [sys.executable or "python3", exe_path]
+    return [exe_path]
+
+def main():
+    base = choose_base_tmp()
+    dest = unique_dir(base)
+    extract_to(dest)
+
+    # find Positron executable
+    candidates = ["positron", "positron.py"]
+    exe = next((os.path.join(dest, n) for n in candidates if os.path.exists(os.path.join(dest, n))), None)
+    if exe is None:
+        print("Error: corrupted payload, 'positron' not found.", file=sys.stderr)
+        sys.exit(2)
+
+    make_executable(exe)
+
+    # Forward CLI args
+    cmd = build_cmd(exe) + sys.argv[1:]
+
+    # Set title = bundle name (if not already provided)
+    bundle_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
+    env = os.environ.copy()
+    env.setdefault("POSITRON_TITLE", bundle_name)
+
+    # Optional verbose logging
+    if env.get("POSITRON_VERBOSE", "").lower() in ("1", "true", "yes"):
+        print("[stub] cwd:", dest)
+        print("[stub] cmd:", cmd)
+        print("[stub] title:", env["POSITRON_TITLE"])
+
+    keep = env.get("POSITRON_KEEP", "").lower() in ("1", "true", "yes")
+    try:
+        rc = subprocess.call(cmd, cwd=dest, env=env)
+    finally:
+        if not keep:
+            try:
+                shutil.rmtree(dest)
+            except Exception:
+                pass
+    sys.exit(rc)
+
+if __name__ == "__main__":
+    main()

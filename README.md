@@ -1,55 +1,68 @@
-# Positron
 
-A tiny **Electron-like** runtime built with **Python + pywebview**.
+
+# 🪐 Positron
+
+A tiny **Electron-like runtime** built with **Python + pywebview**.
 
 - Serves files from `./www` at `http://127.0.0.1:7000`
+
 - Opens a native window that loads that URL
-- **Persistence** (localStorage/cookies/IndexedDB) per bundle
-- **Download helper**: moves files from Downloads with *Save As…* dialog  
-  - asks if you want to overwrite  
-  - auto-renames if you say no  
-  - deletes the file if you cancel the dialog  
-- **Self-extracting bundle**: a single file that extracts `positron` + `www` to a temporary folder and runs the app
+
+- Supports both **static HTML apps** and **React/Vite dev servers**
+
+- **Persistent storage** (localStorage / cookies / IndexedDB) per bundle
+
+- Native `save_file` API and optional Downloads watcher with a **Save As** dialog
+
+- **Self-extracting bundle**: one single file that extracts `positron` + `www` to a temporary folder and runs automatically
+
 - **Cross-platform**: Linux, Windows, macOS
 
 ---
 
-## Project structure
+## 📁 Project structure
 
 ```
-
 .
-├── positron            # runner (Python script / executable)
-├── make\_bundle         # creates self-extracting bundle
+├── positron            # main runner (Python script / executable)
+├── make_bundle         # creates self-extracting bundle
 ├── www/                # your web app (index.html, css, js, …)
 └── requirements.txt    # Python dependencies (pywebview)
-
-````
+```
 
 ---
 
-## Requirements
+## ⚙️ Requirements
 
 ### Common
 
-- Python 3.9+ recommended (3.8+ usually works)  
-- `pywebview`:
+- **Python 3.9+** recommended (3.8+ often works)
+
+- **pywebview**:
 
 ```bash
+python3 -m venv --system-site-packages .venv
+. .venv/bin/activate
 pip install -r requirements.txt
 # or
 pip install pywebview
-````
+```
+
+---
 
 ### Linux
 
-* Backend **GTK/WebKit2** (recommended) **or** **Qt WebEngine**
+Backend options:
 
-Debian/Ubuntu/Mint:
+- ✅ **GTK/WebKit2** (recommended)
+
+- ⚙️ or **Qt WebEngine**
+
+For Debian / Ubuntu / Mint:
 
 ```bash
 sudo apt install python3-gi gir1.2-webkit2-4.1 libwebkit2gtk-4.1-0
-# if 4.1 is missing:
+# if 4.1 is not available:
 sudo apt install python3-gi gir1.2-webkit2-4.0 libwebkit2gtk-4.0-37
 ```
 
@@ -59,24 +72,41 @@ Alternative Qt backend:
 pip install PyQt5 PyQtWebEngine
 ```
 
-Arch/Fedora: install `webkit2gtk` + `python-gobject`, or Qt packages.
-
-### Windows
-
-* `pip install pywebview`
-* **Microsoft Edge WebView2 Runtime** (usually preinstalled on Win10/11).
-* Alternatively: `pip install PyQt5 PyQtWebEngine` and run with `--gui qt`.
-
-⚠️ Do **not** install the package `webview` (different project). Use **`pywebview`**.
-
-### macOS
-
-* `pip install pywebview pyobjc`
-* Alternatively: `pip install PyQt5 PyQtWebEngine` and run with `--gui qt`.
+On Arch / Fedora: install `webkit2gtk` + `python-gobject`, or the Qt packages.
 
 ---
 
-## Quick start (without bundle)
+### Windows
+
+- `pip install pywebview`
+
+- Requires **Microsoft Edge WebView2 Runtime** (preinstalled on Win10/11)
+
+- Or use Qt backend:
+
+  ```bash
+  pip install PyQt5 PyQtWebEngine
+  ./positron --gui qt
+  ```
+
+⚠️ **Important:** Do *not* install the package `webview` — it’s a different project.
+Use **`pywebview`**.
+
+---
+
+### macOS
+
+```bash
+pip install pywebview pyobjc
+# or
+pip install PyQt5 PyQtWebEngine
+```
+
+Run with `--gui qt` if you prefer Qt WebEngine.
+
+---
+
+## 🚀 Quick start (without bundling)
 
 ```bash
 # Linux/macOS
@@ -86,12 +116,12 @@ python3 positron
 py positron
 ```
 
-A window opens on `http://127.0.0.1:7000` serving files from `./www`.
-On first run, a default `www/index.html` is created.
+A native window opens at `http://127.0.0.1:7000` serving files from `./www`.
+On first run, a default `www/index.html` will be created automatically.
 
 ---
 
-## Useful options
+## 🧭 Useful options
 
 ```bash
 # window size and position
@@ -106,29 +136,69 @@ On first run, a default `www/index.html` is created.
 # non-resizable
 ./positron --fixed
 
-# force backend
+# choose backend
 ./positron --gui gtk           # Linux GTK/WebKit
-./positron --gui qt            # Qt WebEngine (all platforms)
+./positron --gui qt            # Qt WebEngine (cross-platform)
 ./positron --gui edgechromium  # Windows WebView2
 ./positron --gui cocoa         # macOS Cocoa/WebKit
 
-# debug console
+# enable debug console
 ./positron --debug
+
+# override browser profile or watched download directory
+./positron --profile-dir ~/.positron/my-profile
+./positron --watch-dir ~/Downloads
 ```
 
 ---
 
-## Creating a self-extracting bundle
+## ⚛️ React / Vite support
+
+Positron automatically detects a **React/Vite project** if a `package.json` file exists.
+
+| Scenario              | Behavior                                                                                |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| `www/index.html` only | Serves static files at `http://127.0.0.1:7000`                                          |
+| `package.json` exists | Runs `npm run dev` and connects to the URL reported by the dev server                    |
+| `--react` flag        | Forces React/Vite mode even without detection                                           |
+
+```bash
+# example: run Vite + React app
+./positron --react
+```
+
+If `node_modules` are missing, Positron automatically runs `npm install` before starting the dev server.
+
+---
+
+## 💾 Native file saving and download watcher
+
+Pages can open a native **Save As** dialog through the pywebview bridge:
+
+```javascript
+const result = await window.pywebview.api.save_file("notes.txt", "Hello");
+```
+
+Positron also watches the system Downloads directory, or the directory selected
+with `--watch-dir`. Completed downloads open a **Save As** dialog. Existing
+destinations require confirmation; declining creates a numbered filename.
+Cancelling deletes the newly downloaded source file.
+
+---
+
+## 📦 Creating a self-extracting bundle
+
+Bundle your app into a **single Python file** that unpacks itself on launch.
 
 ```bash
 # Linux/macOS
 ./make_bundle --positron ./positron --www ./www --out ./myapp
 
 # Windows (.pyw recommended for double-click without console)
-py make_bundle.py --positron .\positron --www .\www --out .\myapp.pyw
+py .\make_bundle --positron .\positron --www .\www --out .\myapp.pyw
 ```
 
-Run:
+Then run:
 
 ```bash
 # Linux/macOS
@@ -136,58 +206,49 @@ Run:
 
 # Windows
 pyw myapp.pyw --size 1200x800 --gui edgechromium
-# if a .bat wrapper was created
+# or via .bat wrapper (auto-created)
 myapp.bat --size 1200x800 --gui edgechromium
 ```
 
-> The bundle forwards **all CLI arguments** to the inner runner.
+> The bundle forwards all CLI arguments to the inner `positron` runner.
 
 ---
 
-## Persistence (localStorage/IndexedDB)
+## 💾 Persistent storage
 
-* Enabled in the runner with `private_mode=False` and `storage_path` per bundle.
-* Data stored in:
+- Each app keeps its own persistent data (localStorage, cookies, IndexedDB).
 
-  * Linux/macOS: `~/.positron/<bundle-name>`
-  * Windows: `C:\Users\<User>\.positron\<bundle-name>`
-* Always use the same origin (`http://127.0.0.1:7000`) for persistence.
+- Persistence is handled by pywebview (`private_mode=False`, `storage_path` per bundle).
 
----
+Stored under:
 
-## Download watcher
+- **Linux/macOS:** `~/.positron/<bundle-name>`
 
-* Watches your system’s default **Downloads** directory
-* Detects finished files (`.part`, `.crdownload`, etc. are ignored)
-* Opens a **Save As…** dialog:
+- **Windows:** `C:\Users\<User>\.positron\<bundle-name>`
 
-  * If file exists → asks to overwrite
-  * If you click *No* → renames as `file (1).ext`
-  * If you *cancel* → file is **deleted** from Downloads
+Static apps always use `http://127.0.0.1:7000`. React/Vite storage belongs to the port chosen by its dev server.
 
 ---
 
-## Window title
+## 🧰 Environment variables
 
-Default = bundle filename.
-Override with env var:
+| Variable             | Description                                |
+| -------------------- | ------------------------------------------ |
+| `POSITRON_TITLE`     | Custom window title                        |
+| `POSITRON_KEEP=1`    | Keep extracted temp dir after exit         |
+| `POSITRON_DEBUG=1`   | Enable pywebview debug mode                |
+| `POSITRON_VERBOSE=1` | Verbose logs from the self-extracting stub |
+| `POSITRON_PROFILE_DIR` | Override the browser storage directory   |
+
+Example:
 
 ```bash
-POSITRON_TITLE="Custom Title" ./myapp
+POSITRON_TITLE="My Cool App" ./myapp
 ```
 
 ---
 
-## Environment variables
-
-* `POSITRON_TITLE` – force window title
-* `POSITRON_KEEP=1` – don’t delete extracted temp dir after exit
-* `POSITRON_DEBUG=1` – enable pywebview debug mode
-* `POSITRON_VERBOSE=1` – extra logs from stub
-
----
-
-## Packaging into native executables
+## 🛠 Packaging into native executables
 
 ### Windows (.exe)
 
@@ -207,7 +268,7 @@ pip install pyinstaller
 pyinstaller --onefile --windowed --name MyApp --collect-all webview myapp
 ```
 
-Alternative with py2app:
+Alternative with **py2app**:
 
 ```bash
 pip install py2app
@@ -223,50 +284,74 @@ pyinstaller --onefile --name myapp --collect-all webview positron
 
 ---
 
-## Troubleshooting
+## 🧩 Security model
 
-* **`ModuleNotFoundError: No module named 'webview'`**
-  → Wrong package. Use `pywebview`, not `webview`.
+- The HTTP server binds only to **127.0.0.1** (loopback only).
 
-  ```bash
-  pip uninstall -y webview
-  pip install pywebview
-  ```
+- Self-extracting bundles unpack to a unique random temp directory.
 
-* **JavaScript doesn’t run / `evaluate_js` fails**
-  → Install a backend with JS support:
-
-  * Linux: WebKit2 (`python3-gi + webkit2gtk`) or Qt (`PyQt5 + PyQtWebEngine`)
-  * Windows: Edge WebView2 Runtime or Qt
-  * macOS: `pyobjc` (Cocoa/WebKit) or Qt
-
-* **LocalStorage/IndexedDB doesn’t persist**
-  → Ensure `private_mode=False` and `storage_path` set
-  → Use consistent origin (`http://127.0.0.1:7000`)
-
-* **Windows: “not a valid Win32 application”**
-  → `.pyw` file is not an `.exe`.
-
-  * Launch with `py myapp.pyw`
-  * Double-click `.pyw`
-  * Or build `.exe` with PyInstaller
+- The temp directory is deleted automatically when the app exits (unless `POSITRON_KEEP=1`).
 
 ---
 
-## Security
+## 🚑 Troubleshooting
 
-* HTTP server binds only to **127.0.0.1** (loopback).
-* Bundle extracts to a unique temporary folder and cleans up on exit (unless `POSITRON_KEEP=1`).
+### “`ModuleNotFoundError: No module named 'webview'`”
+
+You installed the wrong package.
+Run:
+
+```bash
+pip uninstall -y webview
+pip install pywebview
+```
+
+### JavaScript or `evaluate_js` not working
+
+Install a backend that supports JS:
+
+- Linux: WebKit2 (`python3-gi + webkit2gtk`) or Qt (`PyQt5 + PyQtWebEngine`)
+
+- Windows: Edge WebView2 Runtime or Qt backend
+
+- macOS: `pyobjc` (Cocoa/WebKit) or Qt backend
+
+### LocalStorage / IndexedDB doesn’t persist
+
+Ensure `private_mode=False` and `storage_path` are set, and always use `http://127.0.0.1:7000`.
+
+### “Not a valid Win32 application”
+
+`.pyw` files are not `.exe`.
+Use:
+
+- `py myapp.pyw`
+
+- Double-click `.pyw`
+
+- Or build an `.exe` with PyInstaller
 
 ---
 
-## License
+## 🧠 Why Positron?
 
-MIT (or any you choose).
+Because it’s **tiny**, **clean**, and already **cross-platform**.
+Write your UI once (HTML/CSS/JS in `www/`), and get:
+
+- Native window + persistence
+
+- Local HTTP serving
+
+- Optional React/Vite integration
+
+- One-file packaging via `make_bundle`
+
+💡 It’s like Electron — but 100× smaller and pure Python.
 
 ---
 
-## Why Positron?
+## 🪪 License
 
-Because it’s **tiny**, **simple**, and already **cross-platform**:
-Write HTML/CSS/JS in `www/`, and you have a desktop app with persistence, file download handling, and single-file packaging.
+MIT. See [`LICENSE`](LICENSE).
+
+---

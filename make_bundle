@@ -1,50 +1,31 @@
 #!/usr/bin/env python3
-"""
- Create a self-extracting executable that bundles: positron + www
+# Create a self-extracting executable containing: positron + www
+# Usage:
+#   ./make_bundle --positron ./positron --www ./www --out ./myapp.pyw
 
- Usage:
-   ./make_bundle --positron ./positron --www ./www --out ./my-app.pyw
-
- Result:
-   A single launcher file that, when run, extracts to a temp folder,
-   launches ./positron (or positron.py) with the bundled ./www,
-   and deletes the temp folder on exit (unless POSITRON_KEEP=1).
-"""
-
-import argparse
-import base64
-import io
-import zipfile
-import os
-import sys
-import stat
+import argparse, base64, io, zipfile, os, sys, stat
 from pathlib import Path
 
 STUB_TEMPLATE = r'''#!/usr/bin/env python3
-# Positron self-extracting launcher (extracts to a temp dir, cross-platform)
+# Positron self-extracting launcher (cross-platform temporary extraction)
 import os, sys, base64, zipfile, io, tempfile, shutil, subprocess, stat, uuid
 
 def choose_base_tmp():
-    # Let Python decide the best temporary directory on this OS
     return tempfile.gettempdir()
 
 def unique_dir(base):
-    # Create a unique subdirectory for this run (e.g. positron-ab12cd34)
     d = os.path.join(base, f"positron-{uuid.uuid4().hex[:8]}")
     os.makedirs(d, exist_ok=True)
     return d
 
-# Base64-encoded ZIP payload will be injected here by the bundler
 PAYLOAD_B64 = """__PAYLOAD_B64__"""
 
 def extract_to(target):
-    # Decode and extract the embedded ZIP archive into "target"
     raw = base64.b64decode(PAYLOAD_B64.encode("ascii"))
     with zipfile.ZipFile(io.BytesIO(raw)) as zf:
         zf.extractall(target)
 
 def make_executable(path):
-    # Best effort: mark file as executable on POSIX
     try:
         mode = os.stat(path).st_mode
         os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
@@ -52,15 +33,13 @@ def make_executable(path):
         pass
 
 def build_cmd(exe_path):
-    # Build the command used to launch the bundled 'positron'
+    # Windows: if not a real binary, run via Python interpreter
     if os.name == "nt":
-        # On Windows: if it's a "real" executable, run it directly.
         low = exe_path.lower()
         if low.endswith(".exe") or low.endswith(".bat") or low.endswith(".cmd"):
             return [exe_path]
-        # Otherwise run via the same Python interpreter (python.exe or pythonw.exe)
         return [sys.executable or "python", exe_path]
-    # On POSIX: run .py via Python, otherwise execute directly
+    # POSIX: run .py with Python; others directly
     if exe_path.endswith(".py"):
         return [sys.executable or "python3", exe_path]
     return [exe_path]
@@ -70,37 +49,38 @@ def main():
     dest = unique_dir(base)
     extract_to(dest)
 
-    # Locate the launcher inside the payload
+    # find Positron executable
     candidates = ["positron", "positron.py"]
     exe = next((os.path.join(dest, n) for n in candidates if os.path.exists(os.path.join(dest, n))), None)
     if exe is None:
-        print("Error: corrupted payload, 'positron' was not found.", file=sys.stderr)
+        print("Error: corrupted payload, 'positron' not found.", file=sys.stderr)
         sys.exit(2)
 
     make_executable(exe)
 
-    # Forward CLI args and pick the right interpreter/launcher
+    # Forward CLI args
     cmd = build_cmd(exe) + sys.argv[1:]
 
-    # Default window title = bundle filename (without extension), unless already set
+    # Set title = bundle name (if not already provided)
     bundle_name = os.path.splitext(os.path.basename(sys.argv[0]))[0]
     env = os.environ.copy()
     env.setdefault("POSITRON_TITLE", bundle_name)
 
-    # Optional logging
+    # Optional verbose logging
     if env.get("POSITRON_VERBOSE", "").lower() in ("1", "true", "yes"):
         print("[stub] cwd:", dest)
         print("[stub] cmd:", cmd)
         print("[stub] title:", env["POSITRON_TITLE"])
 
-    # Cleanup policy
     keep = env.get("POSITRON_KEEP", "").lower() in ("1", "true", "yes")
     try:
         rc = subprocess.call(cmd, cwd=dest, env=env)
     finally:
         if not keep:
-            try: shutil.rmtree(dest)
-            except Exception: pass
+            try:
+                shutil.rmtree(dest)
+            except Exception:
+                pass
     sys.exit(rc)
 
 if __name__ == "__main__":
@@ -108,26 +88,21 @@ if __name__ == "__main__":
 '''
 
 def make_payload(positron: Path, www: Path) -> str:
-    """Pack the Positron launcher and the ./www directory into a ZIP, then base64-encode it."""
+    """Pack Positron executable + www directory into a ZIP, base64-encoded."""
     mem = io.BytesIO()
     with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as z:
-        # Put the launcher at the ZIP root (e.g. ./positron or ./positron.py)
-        z.write(positron, arcname=positron.name)
-        # Put website assets under ./www/...
+        z.write(positron, arcname="positron")
         for p in www.rglob("*"):
             if p.is_file():
                 z.write(p, arcname=str(Path("www") / p.relative_to(www)))
     return base64.b64encode(mem.getvalue()).decode("ascii")
 
 def main():
-    """Main entry point for the make_bundle runner."""
-    ap = argparse.ArgumentParser(
-        description="Create a self-extracting executable for Positron (bundles launcher + ./www)."
-    )
+    ap = argparse.ArgumentParser(description="Create a self-extracting Positron bundle")
     ap.add_argument("--positron", type=Path, default=Path("positron"),
-                    help="Positron launcher file or script (default: ./positron)")
+                    help="Path to Positron executable or script (default: ./positron)")
     ap.add_argument("--www", type=Path, default=Path("www"),
-                    help="Folder 'www' to include (default: ./www)")
+                    help="Directory 'www' to include (default: ./www)")
     ap.add_argument("--out", type=Path, default=Path("positron-sfx"),
                     help="Output file path (default: ./positron-sfx)")
     args = ap.parse_args()
@@ -135,35 +110,29 @@ def main():
     if not args.positron.exists():
         sys.exit(f"File not found: {args.positron}")
     if not args.www.is_dir():
-        sys.exit(f"Folder not found: {args.www}")
+        sys.exit(f"Directory not found: {args.www}")
 
-    # On Windows: if no extension is provided, default to .pyw for double-click without a console
+    # On Windows: default to .pyw for double-click (no console)
     if os.name == "nt" and args.out.suffix.lower() not in (".py", ".pyw", ".bat", ".cmd", ".exe"):
         args.out = args.out.with_suffix(".pyw")
 
     payload_b64 = make_payload(args.positron, args.www)
-
-    # Inject the payload into the stub template
     script = STUB_TEMPLATE.replace("__PAYLOAD_B64__", payload_b64)
     args.out.write_text(script, encoding="utf-8")
 
-    # Best effort: make the output executable on POSIX
     try:
         mode = os.stat(args.out).st_mode
-        os.chmod(
-            args.out,
-            mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
-        )
-    except Exception:  # pylint: disable=broad-exception-caught
+        mode &= ~(stat.S_IWGRP | stat.S_IWOTH)
+        os.chmod(args.out, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    except Exception:
         pass
 
-    # Optional: create a .bat wrapper for convenience if output is .pyw
+    # Optional .bat launcher for Windows (useful from CMD)
     if os.name == "nt" and args.out.suffix.lower() == ".pyw":
         bat = args.out.with_suffix(".bat")
-        # Use "pyw" so it prefers pythonw.exe (no console). Falls back to PATH associations.
         bat.write_text(f'@echo off\r\npyw "%~dp0{args.out.name}" %*\r\n', encoding="utf-8")
 
-    print(f"Created: {args.out}")
+    print(f"Created bundle: {args.out}")
 
 if __name__ == "__main__":
     main()
